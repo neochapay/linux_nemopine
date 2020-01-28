@@ -124,14 +124,17 @@
 		simple-audio-card,name = "EC25 audio";
 		simple-audio-card,format = "dsp_a";
 		simple-audio-card,mclk-fs = <256>;
+		simple-audio-card,bitclock-master = <&dailink0_master>;
+		simple-audio-card,frame-master = <&dailink0_master>;
 
 		simple-audio-card,cpu {
 			sound-dai = <&i2s0>;
 		};
 
-		simple-audio-card,codec {
+		dailink0_master: simple-audio-card,codec {
 			sound-dai = <&ec25_codec>;
 		};
+
 	};
 
 	ec25_codec: ec25-codec {
@@ -266,6 +269,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2s0_pins>;
 	status = "okay";
+	pinephone-channel-offset-hack;
 };
 
 &i2c0_pins {
