@@ -249,13 +249,14 @@
 		compatible = "galaxycore,gc2145";
 		reg = <0x3c>;
 		clocks = <&ccu CLK_CSI_MCLK>;
-		clock-names = "xclk";
+		clock-names = "xvclk";
 
-		AVDD-supply = <&reg_dldo3>;
-		DVDD-supply = <&reg_aldo1>;
-		IOVDD-supply = <&reg_eldo3>;
+		avdd-supply = <&reg_dldo3>;
+		dvdd-supply = <&reg_aldo1>;
+		dovdd-supply = <&reg_eldo3>;
+
 		reset-gpios = <&pio 4 16 (GPIO_ACTIVE_LOW | GPIO_OPEN_DRAIN)>; /* PE16 */
-		enable-gpios = <&pio 4 17 (GPIO_ACTIVE_LOW | GPIO_OPEN_DRAIN)>; /* PE17 */
+		pwdn-gpios = <&pio 4 17 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>; /* PE17 */
 
 		port {
 			gc2145_ep: endpoint {

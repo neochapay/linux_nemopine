@@ -677,6 +677,12 @@ config VIDEO_OV5640
 	  This is a Video4Linux2 sensor driver for the Omnivision
 	  OV5640 camera sensor with a MIPI CSI-2 interface.
 
+config VIDEO_GC2145
+	tristate "GalaxyCore GC2145 sensor support"
+	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
+	help
+	  Support for the GalaxyCore GC2145 sensor.
+
 config VIDEO_OV5645
 	tristate "OmniVision OV5645 sensor support"
 	depends on OF
