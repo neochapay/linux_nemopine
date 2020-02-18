@@ -9,7 +9,7 @@
 #include <linux/clkdev.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
-#include <linux/device.h>
+//#include <linux/device.h>
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
