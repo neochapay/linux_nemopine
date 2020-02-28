@@ -85,6 +85,7 @@ struct axp20x_batt_ps {
 	/* Maximum constant charge current */
 	unsigned int max_ccc;
 	const struct axp_data	*data;
+	struct power_supply_battery_info batt_info;
 };
 
 static int axp20x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
@@ -190,11 +191,31 @@ static int axp20x_get_constant_charge_current(struct axp20x_batt_ps *axp,
 	return 0;
 }
 
+static int axp20x_get_ocv_voltage(struct axp20x_batt_ps *axp, int *val)
+{
+	int ret;
+	unsigned int ocvh, ocvl, ocv;
+
+	ret = regmap_read(axp->regmap, AXP288_FG_OCVH_REG, &ocvh);
+	if (ret)
+		return ret;
+
+	ret = regmap_read(axp->regmap, AXP288_FG_OCVL_REG, &ocvl);
+	if (ret)
+		return ret;
+
+	ocv = ocvh << 4 | (ocvl & 0xf);
+
+	*val = ocv * 1100;
+	return 0;
+}
+
 static int axp20x_battery_get_prop(struct power_supply *psy,
 				   enum power_supply_property psp,
 				   union power_supply_propval *val)
 {
 	struct axp20x_batt_ps *axp20x_batt = power_supply_get_drvdata(psy);
+	struct power_supply_battery_info *info = &axp20x_batt->batt_info;
 	struct iio_channel *chan;
 	int ret = 0, reg, val1;
 
@@ -288,6 +309,9 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
 		val->intval *= 1000;
 		break;
 
+	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
+		return axp20x_get_ocv_voltage(axp20x_batt, &val->intval);
+
 	case POWER_SUPPLY_PROP_CAPACITY:
 		/* When no battery is present, return capacity is 100% */
 		ret = regmap_read(axp20x_batt->regmap, AXP20X_PWR_OP_MODE,
@@ -297,6 +321,24 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
 
 		if (!(reg & AXP20X_PWR_OP_BATT_PRESENT)) {
 			val->intval = 100;
+			return 0;
+		}
+
+		/* If we have DT OCV tables, use them. */
+		if (info->ocv_table[0]) {
+			ret = axp20x_get_ocv_voltage(axp20x_batt, &val1);
+			if (ret)
+				return -EINVAL;
+
+			/*
+			 * For now use table that's closest to the room
+			 * temperature.
+			 */
+			ret = power_supply_batinfo_ocv2cap(info, val1, 20);
+			if (ret < 0)
+				return ret;
+
+			val->intval = ret;
 			return 0;
 		}
 
@@ -498,6 +540,7 @@ static enum power_supply_property axp20x_battery_props[] = {
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
 	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_VOLTAGE_OCV,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
 	POWER_SUPPLY_PROP_CAPACITY,
@@ -637,8 +680,9 @@ static int axp20x_power_probe(struct platform_device *pdev)
 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
 	struct axp20x_batt_ps *axp20x_batt;
 	struct power_supply_config psy_cfg = {};
-	struct power_supply_battery_info info;
+	struct power_supply_battery_info *info;
 	struct device *dev = &pdev->dev;
+
 	const struct axp_irq_data *irq_data;
 	int irq, ret;
 
@@ -651,6 +695,7 @@ static int axp20x_power_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	axp20x_batt->dev = &pdev->dev;
+	info = &axp20x_batt->batt_info;
 
 	axp20x_batt->batt_v = devm_iio_channel_get(&pdev->dev, "batt_v");
 	if (IS_ERR(axp20x_batt->batt_v)) {
@@ -694,9 +739,9 @@ static int axp20x_power_probe(struct platform_device *pdev)
 
 	axp20x_batt->health = POWER_SUPPLY_HEALTH_GOOD;
 
-	if (!power_supply_get_battery_info(axp20x_batt->batt, &info)) {
-		int vmin = info.voltage_min_design_uv;
-		int ccc = info.constant_charge_current_max_ua;
+	if (!power_supply_get_battery_info(axp20x_batt->batt, info)) {
+		int vmin = info->voltage_min_design_uv;
+		int ccc = info->constant_charge_current_max_ua;
 
 		if (vmin > 0 && axp20x_set_voltage_min_design(axp20x_batt,
 							      vmin))
