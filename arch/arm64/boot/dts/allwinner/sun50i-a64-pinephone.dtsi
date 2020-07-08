@@ -20,9 +20,8 @@
 	backlight: backlight {
 		compatible = "pwm-backlight";
 		pwms = <&r_pwm 0 50000 PWM_POLARITY_INVERTED>;
-		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
-		default-brightness-level = <8>;
 		enable-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
+		/* Backlight configuration differs per PinePhone revision. */
 	};
 
         bat: battery {
@@ -178,6 +177,7 @@
 	bt_sco_codec: bt-sco-codec {
 		#sound-dai-cells = <1>;
 		compatible = "linux,bt-sco";
+		sound-name-prefix = "Bluetooth";
 	};
 
 	chosen {
@@ -187,6 +187,7 @@
 	ec25_codec: ec25-codec {
 		#sound-dai-cells = <0>;
 		compatible = "quectel,ec25";
+		sound-name-prefix = "Baseband";
 	};
 
 	i2c_csi: i2c-csi {
@@ -205,37 +206,39 @@
 			function = LED_FUNCTION_INDICATOR;
 			color = <LED_COLOR_ID_BLUE>;
 			gpios = <&pio 3 20 GPIO_ACTIVE_HIGH>; /* PD20 */
-			retain-state-suspended;
 		};
 
 		green {
 			function = LED_FUNCTION_INDICATOR;
 			color = <LED_COLOR_ID_GREEN>;
 			gpios = <&pio 3 18 GPIO_ACTIVE_HIGH>; /* PD18 */
-			retain-state-suspended;
 		};
 
 		red {
 			function = LED_FUNCTION_INDICATOR;
 			color = <LED_COLOR_ID_RED>;
 			gpios = <&pio 3 19 GPIO_ACTIVE_HIGH>; /* PD19 */
-			retain-state-suspended;
 		};
 	};
 
-	reg_usb0_vbus: usb0-vbus {
+	reg_anx1v0: anx1v0 {
 		compatible = "regulator-fixed";
-		regulator-name = "usb0-vbus";
+		regulator-name = "anx1v0";
+		regulator-min-microvolt = <1000000>;
+		regulator-max-microvolt = <1000000>;
+	};
+
+	reg_usb_5v: usb-5v {
+		compatible = "regulator-fixed";
+		regulator-name = "usb-5v";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
-		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
+		gpio = <&pio 3 8 GPIO_ACTIVE_HIGH>; /* PD8 */
 		enable-active-high;
-		vin-supply = <&reg_vcc5v0>;
 	};
 
 	reg_vbat_bb: vbat-bb {
 		compatible = "regulator-fixed";
-		regulator-always-on;
 		regulator-name = "vbat-bb";
 		regulator-min-microvolt = <3500000>;
 		regulator-max-microvolt = <3500000>;
@@ -250,15 +253,7 @@
 		regulator-name = "vbat-wifi";
 	};
 
-	reg_vcc5v0: vcc5v0 {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc5v0";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		gpio = <&pio 3 8 GPIO_ACTIVE_HIGH>; /* PD8 */
-		enable-active-high;
-	};
-
+	/* This is a charge pump for CC1 and CC2 pins on USB-C connector. */
 	reg_vconn5v0: vconn5v0 {
 		compatible = "regulator-fixed";
 		regulator-name = "vconn5v0";
@@ -352,6 +347,7 @@
 };
 
 &de {
+	//allwinner,pipelines = <&mixer0>;
 	status = "okay";
 };
 
@@ -361,15 +357,13 @@
 
 &dsi {
 	vcc-dsi-supply = <&reg_dldo1>;
-	#address-cells = <1>;
-	#size-cells = <0>;
 	status = "okay";
 
 	panel@0 {
 		compatible = "xingbangda,xbd599";
 		reg = <0>;
 		iovcc-supply = <&reg_dldo2>;
-		power-supply = <&reg_ldo_io0>;
+		vcc-supply = <&reg_ldo_io0>;
 		reset-gpios = <&pio 3 23 GPIO_ACTIVE_LOW>; /* PD23 */
 		backlight = <&backlight>;
 	};
@@ -420,8 +414,6 @@
 		reset-gpios = <&pio 3 3 (GPIO_ACTIVE_LOW | GPIO_OPEN_DRAIN)>; /* PD3 */
 		powerdown-gpios = <&pio 2 0 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>; /* PC0 */
 
-		flash-leds = <&sgm3140_flash>;
-
 		port {
 			ov5640_ep: endpoint {
 				remote-endpoint = <&csi_ov5640_ep>;
@@ -441,7 +433,7 @@
 	status = "okay";
 
 	touchscreen@5d {
-		compatible = "goodix,gt917s", "goodix,gt911";
+		compatible = "goodix,gt917s";
 		reg = <0x5d>;
 		interrupt-parent = <&pio>;
 		interrupts = <7 4 IRQ_TYPE_LEVEL_HIGH>; /* PH4 */
@@ -458,11 +450,15 @@
 	status = "okay";
 
 	/* Magnetometer */
-	lis3mdl@1e {
+	lis3mdl: lis3mdl@1e {
 		compatible = "st,lis3mdl-magn";
 		reg = <0x1e>;
 		vdd-supply = <&reg_dldo1>;
 		vddio-supply = <&reg_dldo1>;
+		mount-matrix = "0", "1", "0",
+						"-1", "0", "0",
+						"0", "0", "-1";
+
 	};
 
 	/* Light/proximity sensor */
@@ -483,9 +479,6 @@
 		interrupts = <7 5 IRQ_TYPE_EDGE_RISING>; /* PH5 */
 		vdd-supply = <&reg_dldo1>;
 		vddio-supply = <&reg_dldo1>;
-		mount-matrix = "0", "1", "0",
-			       "-1", "0", "0",
-			       "0", "0", "-1";
 	};
 };
 
@@ -513,10 +506,6 @@
 	};
 };
 
-&mixer1 {
-	status = "okay";
-};
-
 &mmc0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mmc0_pins>;
@@ -525,6 +514,7 @@
 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
 	disable-wp;
 	bus-width = <4>;
+	post-power-on-delay-ms = <1>; /* power is already turned on by the bootloader */
 	status = "okay";
 };
 
@@ -535,10 +525,14 @@
 	vqmmc-supply = <&reg_dldo4>;
 	bus-width = <4>;
 	non-removable;
+	post-power-on-delay-ms = <1>; /* wifi power is always on */
 	status = "okay";
 
 	rtl8723cs: wifi@1 {
 		reg = <1>;
+//		host-wake-gpios = <&r_pio 0 3 GPIO_ACTIVE_HIGH>; /* PL3 */
+		interrupt-parent = <&r_pio>;
+		interrupts = <0 3 IRQ_TYPE_EDGE_FALLING>; /* PL3 */
 	};
 };
 
@@ -550,6 +544,7 @@
 	bus-width = <8>;
 	non-removable;
 	cap-mmc-hw-reset;
+	post-power-on-delay-ms = <1>; /* power is already turned on by the bootloader */
 	status = "okay";
 };
 
@@ -565,10 +560,19 @@
 	vcc-pb-supply = <&reg_dcdc1>;
 	vcc-pc-supply = <&reg_dcdc1>;
 	vcc-pd-supply = <&reg_dcdc1>;
-	vcc-pe-supply = <&reg_aldo1>;
+	/* pinctrl would enable this even if no camera is powered,
+	 * which is wrong/not necessary
+	 *
+	 * vcc-pe-supply = <&reg_aldo1>; (also used by pogo pins i2c)
+	 */
 	vcc-pf-supply = <&reg_dcdc1>;
 	vcc-pg-supply = <&reg_dldo4>;
 	vcc-ph-supply = <&reg_dcdc1>;
+
+	i2s0_pins: i2s0-pins {
+		pins = "PB4", "PB5", "PB6", "PB7";
+		function = "i2s0";
+	};
 };
 
 &r_pio {
@@ -622,8 +626,8 @@
 
 &reg_aldo3 {
 	regulator-always-on;
-	regulator-min-microvolt = <3000000>;
-	regulator-max-microvolt = <3000000>;
+	regulator-min-microvolt = <2700000>;
+	regulator-max-microvolt = <3300000>;
 	regulator-name = "vcc-pll-avcc";
 };
 
@@ -666,7 +670,7 @@
 &reg_dldo2 {
 	regulator-min-microvolt = <1800000>;
 	regulator-max-microvolt = <1800000>;
-	regulator-name = "vcc-dsi-io";
+	regulator-name = "vcc-mipi-io";
 };
 
 &reg_dldo3 {
@@ -677,7 +681,7 @@
 
 &reg_dldo4 {
 	regulator-min-microvolt = <1800000>;
-	regulator-max-microvolt = <3300000>;
+	regulator-max-microvolt = <1800000>;
 	regulator-name = "vcc-wifi-io";
 };
 
@@ -691,7 +695,7 @@
 &reg_eldo3 {
 	regulator-min-microvolt = <1800000>;
 	regulator-max-microvolt = <1800000>;
-	regulator-name = "dvdd-csi";
+	regulator-name = "dvdd-1v8-csi";
 };
 
 &reg_fldo1 {
@@ -754,6 +758,7 @@
 		frame-master = <&link1_cpu>;
 		bitclock-master = <&link1_cpu>;
 		bitclock-inversion;
+		codec-to-codec;
 
 		link1_cpu: cpu {
 			sound-dai = <&ec25_codec>;
@@ -769,6 +774,8 @@
 		frame-master = <&link2_cpu>;
 		bitclock-master = <&link2_cpu>;
 		bitclock-inversion;
+		frame-inversion;
+		codec-to-codec;
 
 		link2_cpu: cpu {
 			sound-dai = <&bt_sco_codec 0>;
@@ -796,7 +803,7 @@
 		reset-gpios = <&r_pio 0 4 GPIO_ACTIVE_LOW>; /* PL4 */
 		device-wake-gpios = <&pio 7 6 GPIO_ACTIVE_LOW>; /* PH6 */
 		host-wake-gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
-		firmware-postfix = "pinebook";
+		firmware-postfix = "pinephone";
 	};
 };
 
@@ -808,7 +815,7 @@
 };
 
 &usb_otg {
-	dr_mode = "peripheral";
+	dr_mode = "otg";
 	status = "okay";
 };
 
@@ -818,4 +825,38 @@
 
 &usbphy {
 	status = "okay";
+};
+
+&mixer1 {
+//	status = "disabled";
+};
+
+&tcon1 {
+//	status = "disabled";
+};
+
+///////////// HDMI ///////////////
+
+&hdmi {
+	hvcc-supply = <&reg_dldo1>;
+	status = "okay";
+};
+
+&hdmi_out {
+	hdmi_out_con: endpoint {
+		remote-endpoint = <&hdmi_con_in>;
+	};
+};
+
+/ {
+	hdmi-connector {
+		compatible = "hdmi-connector";
+		type = "a";
+
+		port {
+			hdmi_con_in: endpoint {
+				remote-endpoint = <&hdmi_out_con>;
+			};
+		};
+	};
 };
