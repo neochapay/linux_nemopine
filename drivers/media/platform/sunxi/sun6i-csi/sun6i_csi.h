@@ -11,10 +11,11 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-fwnode.h>
+#include <media/v4l2-mc.h>
 
 #include "sun6i_video.h"
 
-struct sun6i_csi;
+#define MAX_ENDPOINTS 4
 
 /**
  * struct sun6i_csi_config - configs for sun6i csi
@@ -40,22 +41,26 @@ struct sun6i_csi {
 
 	struct v4l2_async_notifier	notifier;
 
-	/* video port settings */
-	struct v4l2_fwnode_endpoint	v4l2_ep;
-
 	struct sun6i_csi_config		config;
 
 	struct sun6i_video		video;
 };
+
+struct sun6i_csi_async_subdev {
+	struct v4l2_async_subdev	asd; /* must be first */
+	struct v4l2_fwnode_endpoint	vep;
+};
+
 
 /**
  * sun6i_csi_is_format_supported() - check if the format supported by csi
  * @csi:	pointer to the csi
  * @pixformat:	v4l2 pixel format (V4L2_PIX_FMT_*)
  * @mbus_code:	media bus format code (MEDIA_BUS_FMT_*)
+ * @vep:		parsed CSI side bus endpoint configuration
  */
 bool sun6i_csi_is_format_supported(struct sun6i_csi *csi, u32 pixformat,
-				   u32 mbus_code);
+				   u32 mbus_code, struct v4l2_fwnode_endpoint* vep);
 
 /**
  * sun6i_csi_set_power() - power on/off the csi
@@ -68,9 +73,11 @@ int sun6i_csi_set_power(struct sun6i_csi *csi, bool enable);
  * sun6i_csi_update_config() - update the csi register settings
  * @csi:	pointer to the csi
  * @config:	see struct sun6i_csi_config
+ * @vep:	parsed CSI side bus endpoint configuration
  */
 int sun6i_csi_update_config(struct sun6i_csi *csi,
-			    struct sun6i_csi_config *config);
+			    struct sun6i_csi_config *config, 
+				struct v4l2_fwnode_endpoint* vep);
 
 /**
  * sun6i_csi_update_buf_addr() - update the csi frame buffer address
