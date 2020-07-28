@@ -310,9 +310,6 @@ static int gc2145_write_regs(struct gc2145_dev *sensor, u8 addr,
 	msg.buf = buf;
 	msg.len = data_size + 1;
 
-	dev_dbg(&sensor->i2c_client->dev, "[wr %02x] <= %*ph\n",
-		(u32)addr, data_size, data);
-
 	ret = i2c_transfer(client->adapter, &msg, 1);
 	if (ret < 0) {
 		v4l2_err(&sensor->sd,
@@ -348,9 +345,6 @@ static int gc2145_read_regs(struct gc2145_dev *sensor, u8 addr,
 			 __func__, ret, (u32)addr, data_size);
 		return ret;
 	}
-
-	dev_dbg(&sensor->i2c_client->dev, "[rd %02x] => %*ph\n",
-		(u32)addr, data_size, data);
 
 	return 0;
 }
